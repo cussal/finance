@@ -1,3 +1,6 @@
+# R functions for data analysis
+# Lucas Cusimano
+# 01/26/2018
 
 setwd("~/Google\ Drive/Oeconomica/2017-8/finance/Winter")
 
