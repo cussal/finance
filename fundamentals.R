@@ -2,79 +2,101 @@
 # Lucas Cusimano
 # 01/26/2018
 
+# The below code gives some idea about ways on how to manipuate data, specifically:
+  # reading in data, 
+  # subsetting the data on rows,
+  # creating new columns,
+  # aggregating data,
+  # subsetting the data on columns
+
+# In terms of finance, it demonstrates:
+  # calculating betas
+
+
+# Setting the working directory
 setwd("~/Google\ Drive/Oeconomica/2017-8/finance/Winter")
 
-#indicate data file
-location = "fundamentals.csv"
-location2 = "prices.csv"
-data <- read.csv(location)
-prices_full <- read.csv(location2)
+# Choosing relevant datafiles
+fundamental_location = "fundamentals.csv"
+price_location = "prices.csv"
 
-#Microsoft -- Technology
-#Macy's -- Consumer Discretionary
-#JPMorgan -- Banking
-#Merck & Co -- Pharma
-#McDonalds -- Fast Food
-#Marathon Oil Corp -- Oil
+# Reading the datafiles as variables (read.csv for csv format, see read.table for general formats)
+fundamentals_full <- read.csv(fundamental_location)
+prices_full <- read.csv(price_location)
+
+
+# Creating a list of the above companies' stock tickers, where syntax is: c(item1, item2,...)
 stock_set = c("MSFT","M","JPM","MRK","MCD","MRO")
+  #Microsoft -- Technology
+  #Macy's -- Consumer Discretionary
+  #JPMorgan -- Banking
+  #Merck & Co -- Pharma
+  #McDonalds -- Fast Food
+  #Marathon Oil Corp -- Oil
 
-#fundamentals data
-fund <- subset(data, Ticker.Symbol %in% stock_set)
+# Taking a subset of the data we read in before on stock fundamentals
+# subset(dataset, condition)
+  # condition is a true/false condition for each row
+  # testing inclusion of a given value for the Ticker.Symbol column in the list of stocks we created before
+fund <- subset(fundamentals_full, Ticker.Symbol %in% stock_set)
 
-#price data
+# Taking a subset of price data
 prices <- subset(prices_full, symbol %in% stock_set)
 
-#aggregate tickers by their symbol, finding mean fundamentals data
-#create year column
+
+# Create a new column, year, and fill it with the first four characters in the string Period.Ending
 fund$year <- as.numeric(substring(fund$Period.Ending,1,4))
-#aggregate by ticker and year
+
+# Aggregate:
+  # by their symbol (by=list(...)) and by year
+  # using the mean function to find mean fundamentals data for each company in a year
 by_ticker <- aggregate(x = fund, by=list(fund$Ticker.Symbol, fund$year), mean)
 
-#average price of each year
+# Create year column in the same way as above
 prices$year <- as.numeric(substring(prices$date,1,4))
-#take the mean close price per year and per company
-avg_close_price <- aggregate(x = prices, by=list(prices$symbol,prices$year), mean)[,c("Group.1","close","year")]
+# Aggregate: 
+  # by by their symbol and by year 
+  # using the mean function to find mean price in a year
+avg_close_price <- aggregate(x = prices, by=list(prices$symbol,prices$year), mean)
 
-#merge two data frames by ID
-#total <- merge(fund,prices, by.x=c("Ticker.Symbol"), by.y=c("symbol"))
-#total1 <- merge(by_ticker,prices, by.x=c("Group.1"), by.y=c("symbol"))
-#total1[1,]$close * total1[1,]$Estimated.Shares.Outstanding
+# Selecting certain columns: mean close price per year and per company
+avg_close_price <- avg_close_price[,c("Group.1","close","year")]
 
-#### FACTOR MODEL ####
+#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#
+# A brief tangent to using the above data, here we demonstrate 
+# the CAPM model using hypothetical data
+
+# Create list of years
 years = c(2011,2012,2013,2014,2015)
 
-#Our Factors:
-returns_sp = c(0.15,-0.05,0.02,0.04,0.08)
-returns_SMB = c(0.30,0.01,0.03,0.05,-0.02)
-returns_HML = c(-0.01,0.03,0.05,0.04,0.01)
+#S&P 500 returns
+returns_sp = c(0.15,-0.05,0.02,0.04,0.08) 
 
-#Asset
+# Returns of the Asset
 returns_x = c(0.21,-0.13,0.08,0.10,0.18)
 
-#create returns dataframe
-returns = data.frame(years,returns_sp,returns_SMB,returns_HML,returns_x)
-colnames(returns) <- c("Year","S&P","SMB","HML","X")
+# Put all data together in a dataframe
+returns = data.frame(years,returns_x,returns_sp)
+# Name columns
+colnames(returns) <- c("Year","X","S&P")
 
-#Find Covariance 
+# Find Covariance (ideally you need to subtract the risk-free rate when doing this calculation)
 cov(returns_sp ,returns_x)
+# Find Variance
 var(returns_sp )
+# Find Cov / Var = Beta
 cov(returns_sp ,returns_x) / var(returns_sp )
 
-#Check results with linear model
+# Check results with linear model
 linear_returns <- lm(returns_x~returns_sp, data = returns)
 print(linear_returns)
 
-#!! The covariance and Coefficient of returns_sp should be exactly equal !!#
+#The covariance and coefficient of returns_sp should be exactly equal
+#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#~#
 
-#Extend to multiple regression
-linear_returns <- lm(returns_x~returns_sp+returns_SMB+returns_HML, data = returns)
-print(linear_returns)
+# Back to the Data
 
-############
-
-#Back to the Data
-
-#contains information on outstanding shares, total assets, and price... all the ingredients we need
+# Grab information on outstanding shares, total assets, and price... all the ingredients we need for the three factor model
 info <- merge(avg_close_price,by_ticker, by=c("Group.1","year"))[,c("Group.1","year","close","Estimated.Shares.Outstanding","Total.Assets")]
 #info <- info[c("Group.1", "year", "close")]
 #colnames(info)
@@ -90,5 +112,3 @@ info[order(info[,6],-rank(info[,7])),]
 # beta: cov(rm,ra) / var(rm)
 # run into missing data problem...
 info_w_na <- merge(avg_close_price,by_ticker, by=c("Group.1","year"),all.x=TRUE)[,c("Group.1","year","close","Estimated.Shares.Outstanding","Total.Assets")]
-#transform(info_w_na, Estimated.Shares.Outstanding.New = na.aggregate(Estimated.Shares.Outstanding, by = max))
-#tot_mkt_returns <- aggregate(x = info[,c("year","mkt_cap")], by=list(info$year), sum)
